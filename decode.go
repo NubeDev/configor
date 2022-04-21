@@ -98,7 +98,13 @@ func (configor *Configor) processTags(config interface{}, prefixes ...string) (e
 			}
 		}
 
-		if isBlank := reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface()); isBlank {
+		isPointer := field.Type().Kind().String() == "ptr"
+		// If we introduce a pointer, it gives us ability to see whether that value exist on file or not.
+		// If our field has pointer and has value on file, we don't look further at `default` value.
+		// What if we don't have pointer: `bool false`, `integer 0`, `string ""` value gets override with `default`
+		// value. Sometimes we need `true` value as default and needs to override it by `false` from config.
+		if (isPointer && reflect.ValueOf(field.Interface()).IsNil()) ||
+			(!isPointer && reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface())) {
 			// Set default configuration if blank
 			if value := fieldStruct.Tag.Get("default"); value != "" {
 				if err = yaml.Unmarshal([]byte(value), field.Addr().Interface()); err != nil {
